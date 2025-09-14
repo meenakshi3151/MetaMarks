@@ -1,56 +1,98 @@
-import { ethers } from 'ethers';
+import { ethers } from "ethers";
+import { useWalletStore } from "./walletStore";
+import StudentMarks from "../abis/StudentMarks.json";
+
+const LOCAL_CHAIN_ID = "0x539"; 
 
 let cachedProvider = null;
 
-export function getProvider() {
-  if (!window.ethereum) throw new Error('MetaMask not available');
+export async function getProvider() {
+  const { provider } = useWalletStore.getState();
+
+  if (provider) return provider;
+  if (!window.ethereum) throw new Error("MetaMask not available");
+
+  // Create and cache provider
   if (!cachedProvider) {
     cachedProvider = new ethers.BrowserProvider(window.ethereum);
+    let network = await cachedProvider.getNetwork();
+
+    if (network.chainId !== 1337) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: LOCAL_CHAIN_ID }],
+        });
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: LOCAL_CHAIN_ID,
+                chainName: "Localhost 8545",
+                rpcUrls: ["http://127.0.0.1:8545"],
+                nativeCurrency: { name: "Ethereum", symbol: "ETH", decimals: 18 },
+              },
+            ],
+          });
+        } else {
+          throw switchError;
+        }
+      }
+
+      cachedProvider = new ethers.BrowserProvider(window.ethereum);
+    }
   }
+
   return cachedProvider;
 }
 
 export async function getSigner() {
-  const provider = getProvider();
-  return await provider.getSigner();
+  const provider = await getProvider();
+  return provider.getSigner();
 }
 
-// Placeholder addresses and ABIs; replace with deployed contract details
+export async function getConnectedAccount() {
+  const signer = await getSigner();
+  return signer.getAddress();
+}
+
+export async function initWallet() {
+  const address = await getConnectedAccount();
+  console.log("Connected account:", address);
+  return address;
+}
+
 export const CONTRACTS = {
-  registry: {
-    address: process.env.REACT_APP_REGISTRY_ADDRESS || '0x0000000000000000000000000000000000000000',
-    abi: [],
+  studentMarks: {
+    address: "0x4D5756dfb81de4cACacF1A6C1Cf027dc2534F5d0", // Ganache default deployment
+    abi: StudentMarks.abi,
   },
 };
 
 export async function getContract(name, withSigner = true) {
   const def = CONTRACTS[name];
   if (!def) throw new Error(`Unknown contract: ${name}`);
-  const provider = getProvider();
-  const runner = withSigner ? await provider.getSigner() : provider;
+
+  const provider = await getProvider();
+  const runner = withSigner ? await getSigner() : provider;
+
   return new ethers.Contract(def.address, def.abi, runner);
 }
 
-// Role helpers - to be implemented via contract calls
 export async function fetchRoleFor(address) {
-  // TODO: call registry to resolve role
-  // Return one of 'ADMIN' | 'TEACHER' | 'STUDENT' or null
   return null;
 }
 
-// Marks services - to be implemented
 export async function fetchStudentTranscript(address) {
-  // return { subjects: [{ name, marks }], percentage, status }
-  return { subjects: [], percentage: 0, status: 'PENDING' };
+  return { subjects: [], percentage: 0, status: "PENDING" };
 }
 
 export async function submitMarks(subjectId, studentAddress, marks) {
-  // teacher action
-  return { txHash: '0x' };
+  return { txHash: "0x" };
 }
 
 export async function adminPublishResults() {
-  return { txHash: '0x' };
+  return { txHash: "0x" };
 }
-
-

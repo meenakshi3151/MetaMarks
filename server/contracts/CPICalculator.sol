@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
+import "hardhat/console.sol";
 
 contract CPICalculator {
     uint256 public totalStudents;
@@ -21,6 +22,7 @@ contract CPICalculator {
     function addTeacher(string memory _name, string memory _subject) public {
         teachers.push(Teacher(_name, _subject));
         totalTeachers = teachers.length;
+        console.log("adding teacher");
         for (uint256 i = 0; i < students.length; i++) {
             students[i].marks.push(0);
         }
@@ -28,6 +30,7 @@ contract CPICalculator {
 
     function addStudent(string memory _name) public {
         uint256[] memory emptyMarks = new uint256[](teachers.length);
+        console.log("adding student");
         students.push(Student(_name, emptyMarks));
         totalStudents = students.length;
     }
@@ -40,10 +43,13 @@ contract CPICalculator {
         require(studentIndex < students.length, "Invalid student index");
         require(teacherIndex < teachers.length, "Invalid teacher index");
         students[studentIndex].marks[teacherIndex] = mark;
+        console.log("adding marks");
     }
 
     function calculateCPI(uint256 studentIndex) public view returns (uint256) {
+
         require(studentIndex < students.length, "Invalid student index");
+        return 100;
         uint256 sum = 0;
         uint256 count = students[studentIndex].marks.length;
 

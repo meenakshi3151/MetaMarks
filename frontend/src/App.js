@@ -5,37 +5,29 @@ import AdminDashboard from './components/AdminDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import StudentDashboard from './components/StudentDashboard';
 
-function ConnectWallet() {
-  const { address, isConnecting, error, connect, disconnect } = useWalletStore();
-  return (
-    <div style={{ padding: 16, display: 'flex', gap: 8 }}>
-      {address ? (
-        <>
-          <span>Connected: {address.slice(0, 6)}...{address.slice(-4)}</span>
-          <button onClick={disconnect}>Disconnect</button>
-        </>
-      ) : (
-        <button onClick={connect} disabled={isConnecting}>
-          {isConnecting ? 'Connecting...' : 'Connect MetaMask'}
-        </button>
-      )}
-      {error && <span style={{ color: 'red' }}>{error}</span>}
-    </div>
-  );
-}
-
 function useRole() {
   const role = useWalletStore((s) => s.role);
   return role; // 'ADMIN' | 'TEACHER' | 'STUDENT' | null
 }
 
-function ProtectedRoute({ roles, children }) {
-  const address = useWalletStore((s) => s.address);
-  const role = useRole();
-  if (!address) return <Navigate to="/" replace />;
-  if (roles && role && !roles.includes(role)) return <Navigate to="/" replace />;
-  return children;
+export function ConnectWalletButton() {
+  const { address, connect, isConnecting } = useWalletStore();
+
+  return (
+    <button
+      onClick={connect}
+      disabled={isConnecting}
+      className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md"
+    >
+      {isConnecting
+        ? "Connecting..."
+        : address
+        ? `Connected: ${address.slice(0, 6)}...${address.slice(-4)}`
+        : "Connect Wallet"}
+    </button>
+  );
 }
+
 
 function Home() {
   const role = useRole();
@@ -53,12 +45,10 @@ function Home() {
   );
 }
 
-
-
 function App() {
   return (
     <BrowserRouter>
-      <ConnectWallet />
+    <ConnectWalletButton/>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/admin" element={<AdminDashboard />} />
