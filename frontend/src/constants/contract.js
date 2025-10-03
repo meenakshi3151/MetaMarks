@@ -1,4 +1,12 @@
-export const contractABI = [
+export const contractAddress = "0x540d7E428D5207B30EE03F2551Cbb5751D3c7569"; // Paste the address you copied from Remix inside the quotes
+
+export const contractABI = 
+
+
+
+
+
+[
 	{
 		"inputs": [
 			{
@@ -141,5 +149,4 @@ export const contractABI = [
 		"stateMutability": "view",
 		"type": "function"
 	}
-]
-export const contractAddress = '0x4D5756dfb81de4cACacF1A6C1Cf027dc2534F5d0'
+];

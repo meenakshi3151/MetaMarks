@@ -1,14 +1,14 @@
-import { create } from "zustand";
-import detectEthereumProvider from "@metamask/detect-provider";
-import { ethers } from "ethers";
-import { contractABI, contractAddress } from "../contracts/contract";
+// src/store/walletStore.js
 
-const LOCAL_CHAIN_ID = "0x539"; // Ganache 1337
+import { create } from 'zustand';
+import detectEthereumProvider from '@metamask/detect-provider';
+import { ethers } from 'ethers';
+import { contractAddress, contractABI } from '../constants/contract';
 
 export const useWalletStore = create((set, get) => ({
   address: null,
   chainId: null,
-  role: null,
+  role: null, // 'ADMIN' | 'TEACHER' | 'STUDENT' | null
   isConnecting: false,
   error: null,
   provider: null,
@@ -19,111 +19,55 @@ export const useWalletStore = create((set, get) => ({
   connect: async () => {
     try {
       set({ isConnecting: true, error: null });
+      const detectedProvider = await detectEthereumProvider({ mustBeMetaMask: true });
+      if (!detectedProvider) throw new Error('MetaMask not found. Please install it.');
 
-      const detectedProvider = await detectEthereumProvider({
-        mustBeMetaMask: true,
-      });
-      if (!detectedProvider)
-        throw new Error("MetaMask not found. Please install it.");
-
-      // 🔑 Force MetaMask to prompt account selection every time
-      await detectedProvider.request({
-        method: "wallet_requestPermissions",
-        params: [{ eth_accounts: {} }],
-      });
-
-      // Ensure correct network (Ganache)
-      let currentChainId = await detectedProvider.request({
-        method: "eth_chainId",
-      });
-      if (currentChainId !== LOCAL_CHAIN_ID) {
-        try {
-          await detectedProvider.request({
-            method: "wallet_switchEthereumChain",
-            params: [{ chainId: LOCAL_CHAIN_ID }],
-          });
-        } catch (switchError) {
-          if (switchError.code === 4902) {
-            await detectedProvider.request({
-              method: "wallet_addEthereumChain",
-              params: [
-                {
-                  chainId: LOCAL_CHAIN_ID,
-                  chainName: "Localhost 8545",
-                  rpcUrls: ["http://127.0.0.1:8545"],
-                  nativeCurrency: {
-                    name: "Ethereum",
-                    symbol: "ETH",
-                    decimals: 18,
-                  },
-                },
-              ],
-            });
-          } else {
-            throw switchError;
-          }
-        }
-      }
-
-      // Create ethers provider & signer
       const provider = new ethers.BrowserProvider(detectedProvider);
+      await provider.send("eth_requestAccounts", []);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
       const chainId = (await provider.getNetwork()).chainId.toString();
-      console.log("Account:", address);
-      const net = await provider.getNetwork();
-      console.log("Connected chainId:", net.chainId.toString());
 
-      set({
-        address,
-        chainId,
-        provider,
-        signer,
-        role: null,
-        isConnecting: false,
+      // IMPORTANT: Removed the role-checking logic.
+      // Your contract's ABI does not contain the `isAdmin`, `isTeacher`, or `isStudent` functions.
+      // The `role` will be set to null initially. You'll set it manually for testing.
+      let userRole = null;
+      
+      set({ 
+        address, 
+        chainId, 
+        role: userRole, 
+        provider, 
+        signer, 
+        isConnecting: false 
       });
 
-      // Listen for account/network changes
       if (detectedProvider.on) {
-        detectedProvider.on("accountsChanged", async (accs) => {
+        const handleAccountsChanged = async (accs) => {
           const newAddress = accs[0] || null;
+          set({ address: newAddress });
           if (!newAddress) {
-            set({ address: null, provider: null, signer: null, role: null });
-          } else {
-            const newProvider = new ethers.BrowserProvider(detectedProvider);
-            const newSigner = await newProvider.getSigner();
-            set({
-              address: newAddress,
-              provider: newProvider,
-              signer: newSigner,
-            });
+            set({ role: null, signer: null, provider: null });
           }
-        });
-
-        detectedProvider.on("chainChanged", async (cid) => {
-          if (cid !== LOCAL_CHAIN_ID) {
-            console.warn("Wrong network. Please switch to Ganache.");
-          }
-          const newProvider = new ethers.BrowserProvider(detectedProvider);
-          const newSigner = await newProvider.getSigner();
-          set({ provider: newProvider, signer: newSigner, chainId: cid });
-        });
+        };
+        const handleChainChanged = (cid) => set({ chainId: cid });
+        detectedProvider.removeListener?.('accountsChanged', handleAccountsChanged);
+        detectedProvider.removeListener?.('chainChanged', handleChainChanged);
+        detectedProvider.on('accountsChanged', handleAccountsChanged);
+        detectedProvider.on('chainChanged', handleChainChanged);
       }
     } catch (e) {
       set({ error: e.message, isConnecting: false });
-      console.error("Wallet connection failed:", e);
+      console.error(e);
     }
   },
 
   disconnect: () => {
-    set({
-      address: null,
-      chainId: null,
-      role: null,
-      provider: null,
-      signer: null,
-    });
+    set({ address: null, chainId: null, role: null, provider: null, signer: null });
   },
+
+  // Centralized functions for interacting with the contract.
+
   addStudent: async (name) => {
     const { signer } = get();
     if (!signer) {
@@ -131,11 +75,7 @@ export const useWalletStore = create((set, get) => ({
       return;
     }
     try {
-      const contract = new ethers.Contract(
-        contractAddress,
-        contractABI,
-        signer
-      );
+      const contract = new ethers.Contract(contractAddress, contractABI, signer);
       const transaction = await contract.addStudent(name);
       await transaction.wait();
       set({ error: null });
@@ -145,7 +85,7 @@ export const useWalletStore = create((set, get) => ({
       console.error("Error adding student:", err);
     }
   },
-
+  
   // New function to add a teacher
   addTeacher: async (name, subject) => {
     const { signer } = get();
@@ -154,11 +94,7 @@ export const useWalletStore = create((set, get) => ({
       return;
     }
     try {
-      const contract = new ethers.Contract(
-        contractAddress,
-        contractABI,
-        signer
-      );
+      const contract = new ethers.Contract(contractAddress, contractABI, signer);
       const transaction = await contract.addTeacher(name, subject);
       await transaction.wait();
       set({ error: null });
@@ -177,16 +113,8 @@ export const useWalletStore = create((set, get) => ({
       return;
     }
     try {
-      const contract = new ethers.Contract(
-        contractAddress,
-        contractABI,
-        signer
-      );
-      const transaction = await contract.addMarks(
-        studentIndex,
-        teacherIndex,
-        mark
-      );
+      const contract = new ethers.Contract(contractAddress, contractABI, signer);
+      const transaction = await contract.addMarks(studentIndex, teacherIndex, mark);
       await transaction.wait();
       set({ error: null });
       console.log(`Marks added successfully for student ${studentIndex}.`);
@@ -195,6 +123,44 @@ export const useWalletStore = create((set, get) => ({
       console.error("Error adding marks:", err);
     }
   },
+
+  // Example read functions
+  getTotalStudents: async () => {
+    const { provider } = get();
+    if (!provider) {
+      set({ error: "Provider not available. Please connect wallet." });
+      return null;
+    }
+    try {
+      const contract = new ethers.Contract(contractAddress, contractABI, provider);
+      const total = await contract.totalStudents();
+      set({ error: null });
+      return Number(total);
+    } catch (err) {
+      set({ error: err.message });
+      console.error("Error fetching total students:", err);
+      return null;
+    }
+  },
+  
+  getTotalTeachers: async () => {
+    const { provider } = get();
+    if (!provider) {
+      set({ error: "Provider not available. Please connect wallet." });
+      return null;
+    }
+    try {
+      const contract = new ethers.Contract(contractAddress, contractABI, provider);
+      const total = await contract.totalTeachers();
+      set({ error: null });
+      return Number(total);
+    } catch (err) {
+      set({ error: err.message });
+      console.error("Error fetching total teachers:", err);
+      return null;
+    }
+  },
+
   // New function to calculate CPI
   calculateCPI: async (studentIndex) => {
     const { provider } = get();
@@ -206,7 +172,6 @@ export const useWalletStore = create((set, get) => ({
       const contract = new ethers.Contract(contractAddress, contractABI, provider);
       const cpi = await contract.calculateCPI(studentIndex);
       set({ error: null });
-      console.log("marks", Number(cpi))
       return Number(cpi);
     } catch (err) {
       set({ error: err.message });
@@ -225,7 +190,6 @@ export const useWalletStore = create((set, get) => ({
     try {
       const contract = new ethers.Contract(contractAddress, contractABI, provider);
       const student = await contract.students(studentIndex);
-      console.log("student", student);
       set({ error: null });
       return student;
     } catch (err) {

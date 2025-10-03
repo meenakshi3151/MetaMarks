@@ -1,89 +1,105 @@
-import { useState } from "react";
-import { useWalletStore } from "../store/walletStore";
-import { generateResultPDF } from "../utils/pdf";
+import { useState } from 'react';
+import { useWalletStore } from '../store/walletStore';
+import { generateResultPDF } from '../utils/pdf';
+import {
+  Box,
+  VStack,
+  HStack,
+  Text,
+  Input,
+  Button,
+  useColorModeValue,
+} from '@chakra-ui/react';
 
 export default function StudentDashboard() {
-  const { calculateCPI, getStudent } = useWalletStore();
-  const [studentIndex, setStudentIndex] = useState("");
-  const [studentName, setStudentName] = useState("N/A");
+  // Get the functions and error state from your wallet store
+  const { calculateCPI, getStudent, error } = useWalletStore();
+
+  // State for the student's data
+  const [studentIndex, setStudentIndex] = useState('');
+  const [studentName, setStudentName] = useState('N/A');
   const [studentCPI, setStudentCPI] = useState(null);
-  const [classLabel, setClassLabel] = useState("PENDING");
+  
+  // This state is not directly from the contract, as your ABI doesn't have a 'subjects' function
+  const [subjects, setSubjects] = useState([]); 
+  const [classLabel, setClassLabel] = useState('PENDING');
 
   const handleGetResult = async () => {
     const sIndex = Number(studentIndex);
-    console.log(sIndex);
     if (!isNaN(sIndex)) {
-      console.log('hi');
       try {
-        console.log('hey');
+        // Fetch student name and CPI from the smart contract
         const name = await getStudent(sIndex);
-        console.log(name)
-        let cpi = 5.0;
-        try {
-          console.log('hello');
-          const result = await calculateCPI(sIndex);
-          console.log(result)
-          if (result !== null && !isNaN(result)) {
-            cpi = result;
-          } else {
-            console.warn("CPI returned null, using default 50%");
-          }
-        } catch (cpiError) {
-          console.warn("Failed to calculate CPI, using default 50%:", cpiError);
-        }
-
-        setStudentName(name || "Unknown Student");
+        const cpi = await calculateCPI(sIndex);
+        
+        // Update the component's state
+        setStudentName(name);
         setStudentCPI(cpi);
+        
+        // Example logic to determine class label based on CPI
+        if (cpi >= 8.0) setClassLabel('DISTINCTION');
+        else if (cpi >= 6.0) setClassLabel('FIRST CLASS');
+        else setClassLabel('SECOND CLASS');
+        
+        // TODO: You will need to get the subjects and their marks from the contract
+        // The ABI you provided doesn't have a function for this, so this is a placeholder.
+        // For now, let's use a dummy array for the PDF
+        setSubjects([
+          { name: 'Subject 1', marks: 85 },
+          { name: 'Subject 2', marks: 92 },
+        ]);
 
-        if (cpi >= 8.0) setClassLabel("DISTINCTION");
-        else if (cpi >= 6.0) setClassLabel("FIRST CLASS");
-        else setClassLabel("SECOND CLASS");
       } catch (err) {
-        console.error("Failed to fetch student data, applying defaults:", err);
-        setStudentName("N/A");
-        setStudentCPI(5.0);
-        setClassLabel("SECOND CLASS");
+        console.error("Failed to fetch student data:", err);
       }
     }
   };
 
   const download = () => {
-    const cpiToUse = studentCPI !== null ? studentCPI : 5.0;
-    const nameToUse = studentName !== "N/A" ? studentName : "Unknown Student";
-
+    // Check if we have fetched data before generating the PDF
+    if (studentName === 'N/A' || studentCPI === null) {
+      alert("Please fetch your result first.");
+      return;
+    }
+    
+    // Use the fetched data to generate the PDF
     const doc = generateResultPDF({
-      name: nameToUse,
-      rollNo: `Student Index: ${studentIndex || "N/A"}`,
-      percentage: cpiToUse,
+      name: studentName,
+      rollNo: `Student Index: ${studentIndex}`,
+      subjects,
+      percentage: studentCPI,
       classLabel,
-      hashToSign: "0x",
+      hashToSign: '0x', // Replace with a real transaction hash if available
     });
-    doc.save(`${nameToUse}-result.pdf`);
+    doc.save(`${studentName}-result.pdf`);
   };
 
+  const border = useColorModeValue('gray.200', 'whiteAlpha.200');
+  const panelBg = useColorModeValue('white', 'whiteAlpha.100');
   return (
-    <div style={{ padding: 24 }}>
-      <h3>Student Dashboard</h3>
-      <div>
-        <input
-          type="number"
-          value={studentIndex}
-          onChange={(e) => setStudentIndex(e.target.value)}
-          placeholder="Enter your student index"
-        />
-        <button onClick={handleGetResult}>Get My Result</button>
-      </div>
+    <VStack spacing={6} align="stretch">
+      <Box>
+        <Text fontSize="xl" fontWeight={800}>Student</Text>
+        {error && <Text color="red.300">Error: {error}</Text>}
+      </Box>
 
-      <div style={{ marginTop: 24 }}>
-        <h4>My Result</h4>
-        <p>Name: {studentName}</p>
-        <p>CPI: {studentCPI !== null ? studentCPI.toFixed(2) : "N/A"}</p>
-        <p>Status: {classLabel}</p>
-      </div>
+      <Box p={5} borderWidth="1px" borderColor={border} borderRadius="lg" bg={panelBg}>
+        <Text fontWeight={700} mb={3}>Get My Result</Text>
+        <HStack spacing={3}>
+          <Input type="number" value={studentIndex} onChange={(e) => setStudentIndex(e.target.value)} placeholder="Enter your student index" />
+          <Button onClick={handleGetResult}>Get My Result</Button>
+        </HStack>
+      </Box>
 
-      <button onClick={download} style={{ marginTop: 16 }}>
-        Download Result PDF
-      </button>
-    </div>
+      <Box p={5} borderWidth="1px" borderColor={border} borderRadius="lg" bg={panelBg}>
+        <Text fontWeight={700} mb={3}>My Result</Text>
+        <VStack align="start" spacing={1}>
+          <Text>Name: {studentName}</Text>
+          <Text>CPI: {studentCPI !== null ? studentCPI.toFixed(2) : 'N/A'}</Text>
+          <Text>Status: {classLabel}</Text>
+        </VStack>
+        <Button onClick={download} mt={4} variant="outline">Download Result PDF</Button>
+      </Box>
+    </VStack>
   );
 }
