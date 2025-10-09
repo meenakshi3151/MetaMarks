@@ -22,6 +22,27 @@ export const useWalletStore = create((set, get) => ({
       const detectedProvider = await detectEthereumProvider({ mustBeMetaMask: true });
       if (!detectedProvider) throw new Error('MetaMask not found. Please install it.');
 
+      // Switch to localhost network
+      try {
+        await detectedProvider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x539' }], // 1337 in hex
+        });
+      } catch (switchError) {
+        // If network doesn't exist, add it
+        if (switchError.code === 4902) {
+          await detectedProvider.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: '0x539',
+              chainName: 'Hardhat Local',
+              rpcUrls: ['http://127.0.0.1:8545'],
+              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }
+            }]
+          });
+        }
+      }
+
       const provider = new ethers.BrowserProvider(detectedProvider);
       await provider.send("eth_requestAccounts", []);
       const signer = await provider.getSigner();

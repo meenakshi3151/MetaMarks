@@ -1,4 +1,4 @@
-export const contractAddress = "0x540d7E428D5207B30EE03F2551Cbb5751D3c7569"; // Paste the address you copied from Remix inside the quotes
+export const contractAddress = "fill your created contract"; // Dont push the conrtract address to github
 
 export const contractABI = 
 

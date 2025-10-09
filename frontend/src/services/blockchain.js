@@ -21,7 +21,7 @@ import StudentMarks from '../abis/StudentMarks.json';
 // Replace with your deployed contract address from Remix
 export const CONTRACTS = {
   studentMarks: {
-    address: "0x540d7E428D5207B30EE03F2551Cbb5751D3c7569",
+    address: "fill your created contract", // Dont push the conrtract address to github,
     abi: StudentMarks.abi,
   },
 };

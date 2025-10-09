@@ -9,7 +9,12 @@ async function main() {
   console.log("CPICalculator deployed to:", await cpiCalculator.getAddress());
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .then(() => {
+    console.log("Deployment completed successfully");
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
